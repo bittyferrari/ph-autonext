@@ -46,11 +46,83 @@
     return null;
   }
 
+  // ---- 跳轉 + 新頁面自動播放 ----
+  const PENDING_KEY = 'phAutoNextPending';
+  function navigate(url) {
+    try { sessionStorage.setItem(PENDING_KEY, viewkeyOf(url) || ''); } catch {}
+    location.href = url;
+  }
+
+  function showHint(msg, ms = 6000) {
+    const box = document.createElement('div');
+    box.textContent = msg;
+    box.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483647;background:rgba(0,0,0,.88);' +
+      'color:#fff;padding:10px 14px;border-radius:8px;font:13px sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+    document.body.appendChild(box);
+    setTimeout(() => box.remove(), ms);
+    return box;
+  }
+
+  // 只有「由本外掛跳過來」的頁面才主動播放，一般開網頁不受影響
+  function autoplayIfPending() {
+    let pending = null;
+    try { pending = sessionStorage.getItem(PENDING_KEY); sessionStorage.removeItem(PENDING_KEY); } catch {}
+    if (!pending || pending !== currentKey || !cfg.enabled) return;
+
+    const PLAY_BTNS = ['.mgp_bigPlay', '.mgp_playIcon', '.mgp_play', '[class*="bigPlay"]',
+      'button[aria-label*="play" i]'];
+    let done = false, ticks = 0, mutedVideo = null, hint = null, clickedBtn = false;
+    const isMain = (v) => v.duration && v.duration >= (Number(cfg.minDuration) || 0);
+    const finish = () => { done = true; clearInterval(iv); };
+
+    // 使用者一有操作就停手（不跟使用者搶暫停），並解除我們加的靜音
+    const onUser = () => {
+      if (mutedVideo) mutedVideo.muted = false;
+      if (hint) hint.remove();
+      finish();
+      window.removeEventListener('pointerdown', onUser, true);
+      window.removeEventListener('keydown', onUser, true);
+    };
+    window.addEventListener('pointerdown', onUser, true);
+    window.addEventListener('keydown', onUser, true);
+
+    const tick = () => {
+      if (done) return;
+      if (++ticks > 60) return finish(); // 最多嘗試 30 秒
+      const vids = [...document.querySelectorAll('video')];
+      const v = vids.find((x) => !x.ended && x.offsetParent) || vids[0];
+      if (!v) return;
+      if (!v.paused) { if (isMain(v)) finish(); return; } // 正片已在播（廣告就繼續等）
+
+      // 有些播放器要先點它自己的播放鈕才會載入影片
+      if (!v.currentSrc && !clickedBtn) {
+        for (const s of PLAY_BTNS) {
+          const b = document.querySelector(s);
+          if (b && b.offsetParent) { b.click(); clickedBtn = true; break; }
+        }
+      }
+      const p = v.play();
+      if (p && p.catch) p.catch((err) => {
+        // 瀏覽器擋有聲自動播放 → 改成靜音播放（一定允許）
+        if (err && err.name === 'NotAllowedError' && !v.muted && !done) {
+          v.muted = true;
+          mutedVideo = v;
+          v.play().then(() => {
+            if (!hint) hint = showHint('已靜音自動播放，點一下頁面任何地方即可開聲音');
+          }).catch(() => {});
+        }
+      });
+    };
+    const iv = setInterval(tick, 500);
+    tick();
+  }
+  autoplayIfPending();
+
   let timer = null;
   function showCountdown(url) {
     if (timer) return;
     let left = Math.max(0, Number(cfg.countdown) || 0);
-    if (left === 0) { location.href = url; return; }
+    if (left === 0) { navigate(url); return; }
 
     const box = document.createElement('div');
     box.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483647;background:rgba(0,0,0,.88);' +
@@ -71,10 +143,10 @@
     const stop = () => { clearInterval(timer); timer = null; box.remove(); };
     render();
     cancel.onclick = stop;
-    go.onclick = () => { stop(); location.href = url; };
+    go.onclick = () => { stop(); navigate(url); };
     timer = setInterval(() => {
       left -= 1;
-      if (left <= 0) { stop(); location.href = url; } else render();
+      if (left <= 0) { stop(); navigate(url); } else render();
     }, 1000);
   }
 
