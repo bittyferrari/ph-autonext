@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<style>
+  body { width: 240px; margin: 0; padding: 14px; font: 13px system-ui, sans-serif; background: #1b1b1b; color: #eee; }
+  h1 { font-size: 15px; margin: 0 0 12px; color: #ff9000; }
+  label { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; gap: 8px; }
+  input[type=number] { width: 56px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; padding: 3px 5px; }
+  .hint { color: #888; font-size: 11px; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <h1>PH Auto Next</h1>
+  <label>啟用自動下一部 <input type="checkbox" id="enabled"></label>
+  <label>倒數秒數 <input type="number" id="countdown" min="0" max="30"></label>
+  <label>略過短於幾秒的影片 <input type="number" id="minDuration" min="0" max="300"></label>
+  <label>不重複播放看過的 <input type="checkbox" id="skipWatched"></label>
+  <div class="hint">設定會立即生效，不用重新整理。</div>
+  <script src="popup.js"></script>
+</body>
+</html>

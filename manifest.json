@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "PH Auto Next",
+  "version": "1.0.0",
+  "description": "影片播完後自動跳到下一部相關影片（可倒數取消）",
+  "permissions": ["storage"],
+  "action": { "default_popup": "popup.html", "default_title": "PH Auto Next" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.pornhub.com/view_video.php*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
