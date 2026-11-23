@@ -64,6 +64,8 @@
   }
 
   // 只有「由本外掛跳過來」的頁面才主動播放，一般開網頁不受影響
+  const log = (...a) => console.log('[PHAutoNext]', ...a);
+
   function autoplayIfPending() {
     let pending = null;
     try { pending = sessionStorage.getItem(PENDING_KEY); sessionStorage.removeItem(PENDING_KEY); } catch {}
@@ -73,7 +75,7 @@
       'button[aria-label*="play" i]'];
     let done = false, ticks = 0, mutedVideo = null, hint = null, clickedBtn = false;
     const isMain = (v) => v.duration && v.duration >= (Number(cfg.minDuration) || 0);
-    const finish = () => { done = true; clearInterval(iv); };
+    const finish = () => { if (!done) log('finish, kicks=' + kicks); done = true; clearInterval(iv); };
 
     // 使用者一有操作就停手（不跟使用者搶暫停），並解除我們加的靜音
     const onUser = (e) => {
@@ -100,15 +102,16 @@
         const r = el.getBoundingClientRect();
         if (r.width < 10 || r.height < 10) continue;
         if (r.right < vr.left || r.left > vr.right || r.bottom < vr.top || r.top > vr.bottom) continue;
-        return true;
+        return el;
       }
-      return false;
+      return null;
     };
     // 模擬使用者在播放器中央點一下
     const kick = (v) => {
       const r = v.getBoundingClientRect();
       const x = r.left + r.width / 2, y = r.top + r.height / 2;
       const el = document.elementFromPoint(x, y) || v;
+      log('kick #' + kicks, 'on', el.tagName + '.' + String(el.className).slice(0, 80));
       const o = { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window };
       el.dispatchEvent(new PointerEvent('pointerdown', o));
       el.dispatchEvent(new MouseEvent('mousedown', o));
@@ -124,7 +127,12 @@
       if (++ticks > 120) return finish(); // 最多嘗試 60 秒
       const vids = [...document.querySelectorAll('video')];
       const v = vids.find((x) => !x.ended && x.offsetParent) || vids[0];
-      if (!v) return;
+      if (!v) { log('tick', ticks, 'no video'); return; }
+      const sp = spinnerOver(v);
+      log('tick', ticks, 'videos=' + vids.length, 'paused=' + v.paused, 't=' + v.currentTime.toFixed(1),
+        'dur=' + (v.duration || 0).toFixed(0), 'ready=' + v.readyState, 'muted=' + v.muted,
+        'src=' + (v.currentSrc ? 'yes' : 'no'),
+        'spinner=' + (sp ? sp.tagName + '.' + String(sp.className).slice(0, 60) : 'none'));
       if (!v.paused) {
         if (!isMain(v)) return; // 廣告在播就繼續等
         const now = Date.now();
