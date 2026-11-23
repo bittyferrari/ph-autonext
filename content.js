@@ -88,7 +88,7 @@
     window.addEventListener('keydown', onUser, true);
 
     // 偵測影片上方是否還蓋著轉圈圈（Brave 擋廣告後播放器常卡在這）
-    let playingSince = 0, kicks = 0;
+    let playingSince = 0, kicks = 0, lastKick = 0, clearSince = 0;
     const spinnerOver = (v) => {
       const vr = v.getBoundingClientRect();
       let root = v;
@@ -116,21 +116,30 @@
       el.dispatchEvent(new MouseEvent('mouseup', o));
       el.dispatchEvent(new MouseEvent('click', o));
       // 如果那一下把影片按成暫停，就再播回來
-      setTimeout(() => { if (v.paused && !v.ended) v.play().catch(() => {}); }, 400);
+      setTimeout(() => { if (v.paused && !v.ended) v.play().catch(() => {}); }, 800);
     };
 
     const tick = () => {
       if (done) return;
-      if (++ticks > 80) return finish(); // 最多嘗試 40 秒
+      if (++ticks > 120) return finish(); // 最多嘗試 60 秒
       const vids = [...document.querySelectorAll('video')];
       const v = vids.find((x) => !x.ended && x.offsetParent) || vids[0];
       if (!v) return;
       if (!v.paused) {
         if (!isMain(v)) return; // 廣告在播就繼續等
-        if (!playingSince) playingSince = Date.now();
-        if (Date.now() - playingSince < 1500) return;
-        if (kicks < 3 && spinnerOver(v)) { kicks++; kick(v); playingSince = Date.now(); return; }
-        return finish();
+        const now = Date.now();
+        if (!playingSince) playingSince = now;
+        if (now - playingSince < 1500) return;
+        if (spinnerOver(v)) {
+          clearSince = 0;
+          // 慢的機器上播放器可能還沒準備好，每 2.5 秒再點一次，最多 6 次
+          if (kicks < 6 && now - lastKick > 2500) { kicks++; lastKick = now; kick(v); }
+          return;
+        }
+        // 轉圈圈要連續消失 3 秒才算真的好了
+        if (!clearSince) clearSince = now;
+        if (now - clearSince >= 3000) finish();
+        return;
       }
 
       // 有些播放器要先點它自己的播放鈕才會載入影片
