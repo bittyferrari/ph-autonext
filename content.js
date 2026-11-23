@@ -76,7 +76,8 @@
     const finish = () => { done = true; clearInterval(iv); };
 
     // 使用者一有操作就停手（不跟使用者搶暫停），並解除我們加的靜音
-    const onUser = () => {
+    const onUser = (e) => {
+      if (e && !e.isTrusted) return; // 忽略我們自己模擬的點擊
       if (mutedVideo) mutedVideo.muted = false;
       if (hint) hint.remove();
       finish();
@@ -86,13 +87,51 @@
     window.addEventListener('pointerdown', onUser, true);
     window.addEventListener('keydown', onUser, true);
 
+    // 偵測影片上方是否還蓋著轉圈圈（Brave 擋廣告後播放器常卡在這）
+    let playingSince = 0, kicks = 0;
+    const spinnerOver = (v) => {
+      const vr = v.getBoundingClientRect();
+      let root = v;
+      for (let i = 0; i < 5 && root.parentElement; i++) root = root.parentElement;
+      for (const el of root.querySelectorAll('[class*="load" i],[class*="spinner" i],[class*="buffer" i]')) {
+        if (el === v || !el.offsetParent) continue;
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 10 || r.height < 10) continue;
+        if (r.right < vr.left || r.left > vr.right || r.bottom < vr.top || r.top > vr.bottom) continue;
+        return true;
+      }
+      return false;
+    };
+    // 模擬使用者在播放器中央點一下
+    const kick = (v) => {
+      const r = v.getBoundingClientRect();
+      const x = r.left + r.width / 2, y = r.top + r.height / 2;
+      const el = document.elementFromPoint(x, y) || v;
+      const o = { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window };
+      el.dispatchEvent(new PointerEvent('pointerdown', o));
+      el.dispatchEvent(new MouseEvent('mousedown', o));
+      el.dispatchEvent(new PointerEvent('pointerup', o));
+      el.dispatchEvent(new MouseEvent('mouseup', o));
+      el.dispatchEvent(new MouseEvent('click', o));
+      // 如果那一下把影片按成暫停，就再播回來
+      setTimeout(() => { if (v.paused && !v.ended) v.play().catch(() => {}); }, 400);
+    };
+
     const tick = () => {
       if (done) return;
-      if (++ticks > 60) return finish(); // 最多嘗試 30 秒
+      if (++ticks > 80) return finish(); // 最多嘗試 40 秒
       const vids = [...document.querySelectorAll('video')];
       const v = vids.find((x) => !x.ended && x.offsetParent) || vids[0];
       if (!v) return;
-      if (!v.paused) { if (isMain(v)) finish(); return; } // 正片已在播（廣告就繼續等）
+      if (!v.paused) {
+        if (!isMain(v)) return; // 廣告在播就繼續等
+        if (!playingSince) playingSince = Date.now();
+        if (Date.now() - playingSince < 1500) return;
+        if (kicks < 3 && spinnerOver(v)) { kicks++; kick(v); playingSince = Date.now(); return; }
+        return finish();
+      }
 
       // 有些播放器要先點它自己的播放鈕才會載入影片
       if (!v.currentSrc && !clickedBtn) {
