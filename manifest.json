@@ -3,13 +3,32 @@
   "name": "PH Auto Next",
   "version": "1.0.0",
   "description": "影片播完後自動跳到下一部相關影片（可倒數取消）",
-  "permissions": ["storage"],
-  "action": { "default_popup": "popup.html", "default_title": "PH Auto Next" },
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PH Auto Next",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
   "content_scripts": [
     {
-      "matches": ["https://*.pornhub.com/view_video.php*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://*.pornhub.com/view_video.php*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }
